@@ -7,7 +7,6 @@ public sealed class ApplicationDbContext : DbContext
 {
     public ApplicationDbContext(DbContextOptions options) : base(options)
     {
-        Database.Migrate();
     }
 
     public DbSet<Store> Stores { get; set; }

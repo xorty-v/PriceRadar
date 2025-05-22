@@ -14,7 +14,11 @@ internal sealed class OfferConfiguration : IEntityTypeConfiguration<Offer>
 
         builder.HasIndex(o => o.Url).IsUnique();
 
-        builder.Property(o => o.Category).IsRequired();
+        builder
+            .HasOne(o => o.Category)
+            .WithMany()
+            .HasForeignKey(o => o.CategoryId)
+            .IsRequired();
 
         builder.HasOne(o => o.Product)
             .WithMany(p => p.Offers)
