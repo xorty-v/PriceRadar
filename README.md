@@ -21,4 +21,4 @@ PuppeteerSharp для эмуляции браузера. Долго вообще
 При росте числа сайтов хочется продумать масштабирование: [ранее пробовал запускать несколько инстансов с синхронизацией](https://gist.github.com/xorty-v/37e77d142c112116e287780e520041fd),
 но моя реализация выглядит костыльно.
 
-![image](https://github.com/user-attachments/assets/f55bb524-9656-45a5-be73-451618b681e0)
+![image](https://github.com/user-attachments/assets/ea2e2f8c-b5f1-4fba-aab6-7c00f5de9627)
