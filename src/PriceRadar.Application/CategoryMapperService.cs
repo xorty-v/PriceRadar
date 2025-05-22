@@ -5,7 +5,7 @@ namespace PriceRadar.Application;
 
 public interface ICategoryMapperService
 {
-    public Guid? Map(StoreType store, string categoryName);
+    public Guid Map(StoreType store, string categoryName);
 }
 
 public class CategoryMapperService : ICategoryMapperService
@@ -28,8 +28,11 @@ public class CategoryMapperService : ICategoryMapperService
             [StoreType.EliteElectronic] = new(StringComparer.OrdinalIgnoreCase)
             {
                 ["Notebook"] = Constants.PredefinedIds.Categories.Laptops,
+                ["note-pc"] = Constants.PredefinedIds.Categories.Laptops,
                 ["Mobile Phone"] = Constants.PredefinedIds.Categories.Smartphones,
+                ["Mobile-Phone"] = Constants.PredefinedIds.Categories.Smartphones,
                 ["Monitor"] = Constants.PredefinedIds.Categories.Monitors,
+                ["monitor"] = Constants.PredefinedIds.Categories.Monitors,
                 ["Headphones"] = Constants.PredefinedIds.Categories.Headphones,
                 ["Keyboard"] = Constants.PredefinedIds.Categories.Keyboards,
                 ["Mouse"] = Constants.PredefinedIds.Categories.Mouses
@@ -46,7 +49,7 @@ public class CategoryMapperService : ICategoryMapperService
         };
     }
 
-    public Guid? Map(StoreType store, string categoryName)
+    public Guid Map(StoreType store, string categoryName)
     {
         if (_map.TryGetValue(store, out var categoryDict) &&
             categoryDict.TryGetValue(categoryName.Trim(), out var category))
@@ -54,6 +57,6 @@ public class CategoryMapperService : ICategoryMapperService
             return category;
         }
 
-        return null;
+        throw new InvalidOperationException($"Category '{categoryName}' not found for store '{store}'.");
     }
 }

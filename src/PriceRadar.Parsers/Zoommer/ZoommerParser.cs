@@ -5,6 +5,7 @@ using PriceRadar.Application.Abstractions.Loaders;
 using PriceRadar.Application.Abstractions.Parsers;
 using PriceRadar.Domain.RawEntities;
 using PriceRadar.Parsers.Abstractions;
+using PriceRadar.Parsers.Zoommer.Helpers;
 using PriceRadar.Parsers.Zoommer.JsonModels;
 
 namespace PriceRadar.Parsers.Zoommer;
@@ -101,7 +102,7 @@ public class ZoommerParser : BaseParser, IParser
             var offerRaw = new OfferRaw
             {
                 Name = jsonProduct.Name,
-                Category = jsonProduct.ParentCategory,
+                Category = CategoryMap.GetCategoryName(jsonProduct.CategoryId, jsonProduct.SubCategoryId),
                 Url = "https://zoommer.ge/en/" + jsonProduct.Route,
                 Price = hasDiscount ? jsonProduct.PreviousPrice.Value : jsonProduct.ActualPrice,
                 DiscountPrice = hasDiscount ? jsonProduct.ActualPrice : 0

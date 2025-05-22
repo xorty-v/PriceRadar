@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using PriceRadar.Infrastructure;
@@ -11,9 +12,11 @@ using PriceRadar.Infrastructure;
 namespace PriceRadar.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250522185054_AddCategoryIdToOffer")]
+    partial class AddCategoryIdToOffer
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -75,8 +78,13 @@ namespace PriceRadar.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("CategoryId")
+                    b.Property<Guid?>("CategoryId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("CategoryRaw")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("Category");
 
                     b.Property<bool>("IsAvailable")
                         .HasColumnType("boolean");
@@ -199,9 +207,7 @@ namespace PriceRadar.Infrastructure.Migrations
                 {
                     b.HasOne("PriceRadar.Domain.Entities.Category", "Category")
                         .WithMany()
-                        .HasForeignKey("CategoryId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .HasForeignKey("CategoryId");
 
                     b.HasOne("PriceRadar.Domain.Entities.Product", "Product")
                         .WithMany("Offers")

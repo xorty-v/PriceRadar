@@ -7,6 +7,7 @@ namespace PriceRadar.Application;
 
 public class ParserService : IParserService
 {
+    private readonly ICategoryMapperService _categoryMapperService;
     private readonly IOfferRepository _offerRepository;
     private readonly IParserFactory _parserFactory;
     private readonly IStoreRepository _storeRepository;
@@ -14,11 +15,13 @@ public class ParserService : IParserService
     public ParserService(
         IParserFactory parserFactory,
         IOfferRepository offerRepository,
-        IStoreRepository storeRepository)
+        IStoreRepository storeRepository,
+        ICategoryMapperService categoryMapperService)
     {
         _parserFactory = parserFactory;
         _offerRepository = offerRepository;
         _storeRepository = storeRepository;
+        _categoryMapperService = categoryMapperService;
     }
 
     public async Task RunAllParsers()
@@ -66,7 +69,7 @@ public class ParserService : IParserService
                     {
                         Url = rawOffer.Url,
                         Name = rawOffer.Name,
-                        Category = rawOffer.Category,
+                        CategoryId = _categoryMapperService.Map(storeType, rawOffer.Category),
                         StoreId = store.Id,
                         IsAvailable = true,
                         PriceHistories = new List<PriceHistory>
