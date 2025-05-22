@@ -101,7 +101,7 @@ public class EliteElectronicParser : BaseParser, IParser
             var offerRaw = new OfferRaw
             {
                 Name = jsonProduct.Name,
-                Category = jsonProduct.ParentCategory,
+                Category = jsonProduct.Category,
                 Url = $"https://ee.ge/{jsonProduct.ParentCategory}/{jsonProduct.Category}/{jsonProduct.ProductSlug}",
                 Price = jsonProduct.ActualPrice,
                 DiscountPrice = jsonProduct.SalePrice
