@@ -9,6 +9,7 @@ public static class DependencyInjection
     {
         services.AddScoped<IParserService, ParserService>();
         services.AddScoped<ICategoryMapperService, CategoryMapperService>();
+        services.AddScoped<IProductMatcherService, ProductMatcherService>();
 
         return services;
     }

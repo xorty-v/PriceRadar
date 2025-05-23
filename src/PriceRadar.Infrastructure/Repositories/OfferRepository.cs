@@ -32,4 +32,11 @@ internal sealed class OfferRepository : IOfferRepository
             .Where(o => o.StoreId == storeId)
             .ToListAsync();
     }
+
+    public async Task<List<Offer>> GetOffersByCategoryAsync(Guid categoryId)
+    {
+        return await _dbContext.Offers
+            .Where(o => o.CategoryId == categoryId && o.ProductId == null)
+            .ToListAsync();
+    }
 }

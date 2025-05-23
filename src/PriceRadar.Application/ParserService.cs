@@ -10,18 +10,21 @@ public class ParserService : IParserService
     private readonly ICategoryMapperService _categoryMapperService;
     private readonly IOfferRepository _offerRepository;
     private readonly IParserFactory _parserFactory;
+    private readonly IProductMatcherService _productMatcherService;
     private readonly IStoreRepository _storeRepository;
 
     public ParserService(
         IParserFactory parserFactory,
         IOfferRepository offerRepository,
         IStoreRepository storeRepository,
-        ICategoryMapperService categoryMapperService)
+        ICategoryMapperService categoryMapperService,
+        IProductMatcherService productMatcherService)
     {
         _parserFactory = parserFactory;
         _offerRepository = offerRepository;
         _storeRepository = storeRepository;
         _categoryMapperService = categoryMapperService;
+        _productMatcherService = productMatcherService;
     }
 
     public async Task RunAllParsers()
@@ -69,7 +72,7 @@ public class ParserService : IParserService
                     {
                         Url = rawOffer.Url,
                         Name = rawOffer.Name,
-                        CategoryId = _categoryMapperService.Map(storeType, rawOffer.Category),
+                        CategoryId = _categoryMapperService.Map(storeType, rawOffer.Category).Value,
                         StoreId = store.Id,
                         IsAvailable = true,
                         PriceHistories = new List<PriceHistory>
@@ -96,5 +99,7 @@ public class ParserService : IParserService
             if (newOffers.Any()) await _offerRepository.AddOffersAsync(newOffers);
             if (offersToUpdate.Any()) await _offerRepository.UpdateOffersAsync(offersToUpdate);
         }
+
+        await _productMatcherService.MatchOffersToProductsAsync();
     }
 }

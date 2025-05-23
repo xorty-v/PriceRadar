@@ -33,6 +33,9 @@ public static class DependencyInjection
 
         services.AddScoped<IStoreRepository, StoreRepository>();
         services.AddScoped<IOfferRepository, OfferRepository>();
+        services.AddScoped<IProductRepository, ProductRepository>();
+        services.AddScoped<ICategoryRepository, CategoryRepository>();
+        services.AddScoped<IOfferRepository, OfferRepository>();
     }
 
     private static void AddLoaders(IServiceCollection services)
