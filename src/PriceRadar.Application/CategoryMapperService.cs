@@ -5,7 +5,7 @@ namespace PriceRadar.Application;
 
 public interface ICategoryMapperService
 {
-    public Guid Map(StoreType store, string categoryName);
+    public Guid? Map(StoreType store, string categoryName);
 }
 
 public class CategoryMapperService : ICategoryMapperService
@@ -49,7 +49,7 @@ public class CategoryMapperService : ICategoryMapperService
         };
     }
 
-    public Guid Map(StoreType store, string categoryName)
+    public Guid? Map(StoreType store, string categoryName)
     {
         if (_map.TryGetValue(store, out var categoryDict) &&
             categoryDict.TryGetValue(categoryName.Trim(), out var category))
@@ -57,6 +57,6 @@ public class CategoryMapperService : ICategoryMapperService
             return category;
         }
 
-        throw new InvalidOperationException($"Category '{categoryName}' not found for store '{store}'.");
+        return null;
     }
 }
