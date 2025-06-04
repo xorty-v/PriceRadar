@@ -44,7 +44,7 @@ public class CategoryMapperService : ICategoryMapperService
                 ["Monitors"] = Constants.PredefinedIds.Categories.Monitors,
                 ["Headphones & Headsets"] = Constants.PredefinedIds.Categories.Headphones,
                 ["Keyboards"] = Constants.PredefinedIds.Categories.Keyboards,
-                ["Mouse"] = Constants.PredefinedIds.Categories.Mouses
+                ["Mouses"] = Constants.PredefinedIds.Categories.Mouses
             }
         };
     }

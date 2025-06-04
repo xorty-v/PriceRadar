@@ -56,41 +56,64 @@ public class ZoommerParser : BaseParser, IParser
     public override async Task<HashSet<OfferRaw>> ParseOffersAsync(List<CategoryRaw> categories)
     {
         var offers = new HashSet<OfferRaw>();
-        var categoryUrls = categories.Select(c => Regex.Match(c.Url, @"\d+$").Value).ToList();
+        var categoryUrls = ExtractCategoryUrls(categories);
 
-        for (int i = 0; i < categoryUrls.Count; i++)
+        foreach (var categoryUrl in categoryUrls)
         {
-            string categoryUrl = categoryUrls[i];
-            string initialUrl = $"{ProductUrl}{categoryUrl}&Page=1&Limit=28";
+            var initialUrl = BuildPageUrl(categoryUrl, 1);
 
-            string initialPage = await _staticPageLoader.LoadPageAsync(initialUrl, HttpMethod.Get, null);
-            if (string.IsNullOrWhiteSpace(initialPage)) continue;
+            var initialPage = await LoadPageAsync(initialUrl);
+            if (initialPage == null)
+            {
+                continue;
+            }
 
-            var response = JsonSerializer.Deserialize<JsonProductList>(initialPage);
-            if (response?.Products == null) continue;
+            offers.UnionWith(MapOffers(initialPage.Products));
 
-            offers.UnionWith(MapOffers(response.Products));
-
-            int totalPages = (int)Math.Ceiling(response.TotalCount / 28.0);
-            if (totalPages <= 1) continue;
+            int totalPages = CalculateTotalPages(initialPage.TotalCount);
+            if (totalPages <= 1)
+            {
+                continue;
+            }
 
             for (int page = 2; page <= totalPages; page++)
             {
-                string pageUrl = $"{ProductUrl}{categoryUrl}&Page={page}&Limit=28";
-                string pageContent = await _staticPageLoader.LoadPageAsync(pageUrl, HttpMethod.Get, null);
+                var pageUrl = BuildPageUrl(categoryUrl, page);
 
-                if (string.IsNullOrWhiteSpace(pageContent)) continue;
-
-                var additionalResponse = JsonSerializer.Deserialize<JsonProductList>(pageContent);
-                if (additionalResponse?.Products != null)
+                var pageData = await LoadPageAsync(pageUrl);
+                if (pageData?.Products != null)
                 {
-                    offers.UnionWith(MapOffers(additionalResponse.Products));
+                    offers.UnionWith(MapOffers(pageData.Products));
                 }
             }
         }
 
         return offers;
     }
+
+    private List<string> ExtractCategoryUrls(List<CategoryRaw> categories)
+    {
+        return categories
+            .Select(c => Regex.Match(c.Url, @"\d+$").Value)
+            .Where(url => !string.IsNullOrEmpty(url))
+            .ToList();
+    }
+
+    private async Task<JsonProductList?> LoadPageAsync(string url)
+    {
+        var pageContent = await _staticPageLoader.LoadPageAsync(url, HttpMethod.Get, null);
+
+        if (string.IsNullOrWhiteSpace(pageContent))
+        {
+            return null;
+        }
+
+        return JsonSerializer.Deserialize<JsonProductList>(pageContent);
+    }
+
+    private string BuildPageUrl(string categoryUrl, int page) => $"{ProductUrl}{categoryUrl}&Page={page}&Limit=28";
+
+    private int CalculateTotalPages(int totalCount) => (int)Math.Ceiling(totalCount / 28.0);
 
     private IEnumerable<OfferRaw> MapOffers(List<JsonProduct> jsonProducts)
     {

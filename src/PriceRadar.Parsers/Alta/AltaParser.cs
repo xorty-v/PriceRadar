@@ -1,4 +1,5 @@
 using AngleSharp;
+using AngleSharp.Dom;
 using PriceRadar.Application;
 using PriceRadar.Application.Abstractions.Loaders;
 using PriceRadar.Application.Abstractions.Parsers;
@@ -24,7 +25,7 @@ public class AltaParser : BaseParser, IParser
     }
 
     protected override string CategoryUrl { get; } = "https://alta.ge/?sl=en";
-    protected override string ProductUrl { get; }
+    protected override string ProductUrl { get; } = string.Empty;
 
     public async Task<List<OfferRaw>> ParseAsync()
     {
@@ -59,66 +60,105 @@ public class AltaParser : BaseParser, IParser
 
         foreach (var category in categories)
         {
-            var pageIndex = 1;
-
-            while (true)
+            var firstPageContent = await _browserPageLoader.LoadPageAsync(category.Url);
+            if (string.IsNullOrWhiteSpace(firstPageContent))
             {
-                var pageUrl = pageIndex == 1
-                    ? category.Url
-                    : category.Url.Replace(".html", $"-page-{pageIndex}.html");
+                continue;
+            }
 
-                var pageContent = await _browserPageLoader.LoadPageAsync(pageUrl);
-                var document = await _browsingContext.OpenAsync(req => req.Content(pageContent));
+            var firstDocument = await _browsingContext.OpenAsync(req => req.Content(firstPageContent));
+            ExtractOffersFromPage(firstDocument, category.Name, offers);
 
-                var productBlocks = document.QuerySelectorAll("div.ty-grid-list__item");
-                if (productBlocks.Length == 0)
-                    break;
+            int totalPages = CalculateTotalPages(firstDocument);
+            if (totalPages <= 1)
+            {
+                continue;
+            }
 
-                foreach (var block in productBlocks)
-                {
-                    var titleElement = block.QuerySelector("a.product-title");
-                    var name = titleElement?.TextContent.Trim();
-                    var url = titleElement?.GetAttribute("href")?.Trim();
+            var additionalUrls = BuildPageUrls(category.Url, totalPages);
 
-                    var priceText = block.QuerySelector("span.ty-price-num")?.TextContent.Trim();
-                    var oldPriceText = block.QuerySelector("span.ty-list-price .ty-strike span")?.TextContent.Trim();
+            var loadTasks = additionalUrls.Select(url => _browserPageLoader.LoadPageAsync(url));
+            var pageContents = await Task.WhenAll(loadTasks);
 
-                    if (!string.IsNullOrEmpty(name) && !string.IsNullOrEmpty(url))
-                    {
-                        var fullUrl = url.StartsWith("http") ? url : $"https://alta.ge{url}";
-
-                        var discount = ParsePrice(priceText);
-                        var oldPrice = ParsePrice(oldPriceText);
-
-                        decimal price, discountPrice;
-
-                        if (oldPrice.HasValue && oldPrice.Value > 0)
-                        {
-                            price = oldPrice.Value;
-                            discountPrice = discount ?? 0;
-                        }
-                        else
-                        {
-                            price = discount ?? 0;
-                            discountPrice = 0;
-                        }
-
-                        offers.Add(new OfferRaw
-                        {
-                            Name = name,
-                            Url = fullUrl,
-                            Price = price,
-                            DiscountPrice = discountPrice,
-                            Category = category.Name
-                        });
-                    }
-                }
-
-                pageIndex++;
+            foreach (var content in pageContents.Where(c => !string.IsNullOrWhiteSpace(c)))
+            {
+                var document = await _browsingContext.OpenAsync(req => req.Content(content));
+                ExtractOffersFromPage(document, category.Name, offers);
             }
         }
 
         return offers;
+    }
+
+    private void ExtractOffersFromPage(IDocument document, string categoryName, HashSet<OfferRaw> offers)
+    {
+        var productBlocks = document.QuerySelectorAll("div.ty-grid-list__item");
+
+        foreach (var block in productBlocks)
+        {
+            var titleElement = block.QuerySelector("a.product-title");
+            var name = titleElement?.TextContent.Trim();
+            var url = titleElement?.GetAttribute("href")?.Trim();
+
+            var priceText = block.QuerySelector("span.ty-price-num")?.TextContent.Trim();
+            var oldPriceText = block.QuerySelector("span.ty-list-price .ty-strike span")?.TextContent.Trim();
+
+            if (!string.IsNullOrEmpty(name) && !string.IsNullOrEmpty(url))
+            {
+                var fullUrl = url.StartsWith("http") ? url : $"https://alta.ge{url}";
+                decimal? discount = ParsePrice(priceText);
+                decimal? oldPrice = ParsePrice(oldPriceText);
+
+                decimal price, discountPrice;
+                if (oldPrice.HasValue && oldPrice.Value > 0)
+                {
+                    price = oldPrice.Value;
+                    discountPrice = discount ?? 0;
+                }
+                else
+                {
+                    price = discount ?? 0;
+                    discountPrice = 0;
+                }
+
+                offers.Add(new OfferRaw
+                {
+                    Name = name,
+                    Url = fullUrl,
+                    Price = price,
+                    DiscountPrice = discountPrice,
+                    Category = categoryName
+                });
+            }
+        }
+    }
+
+    private int CalculateTotalPages(IDocument document)
+    {
+        var countText = document.QuerySelector("div.count-cp")?.TextContent?.Trim().Split()[0];
+        if (int.TryParse(countText, out int totalCount))
+        {
+            return Math.Max(1, (int)Math.Ceiling(totalCount / 16.0));
+        }
+
+        return 1;
+    }
+
+    private List<string> BuildPageUrls(string baseUrl, int totalPages)
+    {
+        var urls = new List<string>();
+        for (int i = 2; i <= totalPages; i++)
+        {
+            urls.Add(baseUrl.Replace(".html", $"-page-{i}.html"));
+        }
+
+        return urls;
+    }
+
+    private async Task<List<string>> LoadPagesAsync1(List<string> urls)
+    {
+        var loadTasks = urls.Select(url => _browserPageLoader.LoadPageAsync(url));
+        return (await Task.WhenAll(loadTasks)).ToList();
     }
 
     private decimal? ParsePrice(string? priceText)

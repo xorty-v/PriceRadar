@@ -58,41 +58,59 @@ public class EliteElectronicParser : BaseParser, IParser
     public override async Task<HashSet<OfferRaw>> ParseOffersAsync(List<CategoryRaw> categories)
     {
         var offers = new HashSet<OfferRaw>();
-        var categoryUrls = categories.Select(c => c.Url.Split('/').Last()).ToList();
+        var categoryUrls = ExtractCategoryUrls(categories);
 
-        for (int i = 0; i < categoryUrls.Count; i++)
+        foreach (var categoryUrl in categoryUrls)
         {
-            var urlPart = categoryUrls[i];
-            var content = PostRequestBody.Create(urlPart);
+            var initialPage = await LoadProductPageAsync(categoryUrl, 1);
+            if (initialPage?.Products == null)
+            {
+                continue;
+            }
 
-            var initialPage = await _staticPageLoader.LoadPageAsync(ProductUrl, HttpMethod.Post, content);
-            if (string.IsNullOrWhiteSpace(initialPage)) continue;
+            offers.UnionWith(MapOffers(initialPage.Products));
 
-            var response = JsonSerializer.Deserialize<JsonProductList>(initialPage);
-            if (response?.Products == null) continue;
-
-            offers.UnionWith(MapOffers(response.Products));
-
-            int totalPages = (int)Math.Ceiling(response.TotalCount / 10.0);
-            if (totalPages <= 1) continue;
+            int totalPages = CalculateTotalPages(initialPage.TotalCount);
+            if (totalPages <= 1)
+            {
+                continue;
+            }
 
             for (int page = 2; page <= totalPages; page++)
             {
-                var additionalContent = PostRequestBody.Create(urlPart, page);
-                var pageContent = await _staticPageLoader.LoadPageAsync(ProductUrl, HttpMethod.Post, additionalContent);
-
-                if (string.IsNullOrWhiteSpace(pageContent)) continue;
-
-                var additionalResponse = JsonSerializer.Deserialize<JsonProductList>(pageContent);
-                if (additionalResponse?.Products != null)
+                var additionalData = await LoadProductPageAsync(categoryUrl, page);
+                if (additionalData?.Products != null)
                 {
-                    offers.UnionWith(MapOffers(response.Products));
+                    offers.UnionWith(MapOffers(additionalData.Products));
                 }
             }
         }
 
         return offers;
     }
+
+    private List<string> ExtractCategoryUrls(List<CategoryRaw> categories)
+    {
+        return categories
+            .Select(c => c.Url.Split('/').Last())
+            .Where(part => !string.IsNullOrEmpty(part))
+            .ToList();
+    }
+
+    private async Task<JsonProductList?> LoadProductPageAsync(string categoryUrl, int page)
+    {
+        var requestBody = PostRequestBody.Create(categoryUrl, page);
+        var pageContent = await _staticPageLoader.LoadPageAsync(ProductUrl, HttpMethod.Post, requestBody);
+
+        if (string.IsNullOrWhiteSpace(pageContent))
+        {
+            return null;
+        }
+
+        return JsonSerializer.Deserialize<JsonProductList>(pageContent);
+    }
+
+    private int CalculateTotalPages(int totalCount) => (int)Math.Ceiling(totalCount / 10.0);
 
     private IEnumerable<OfferRaw> MapOffers(List<JsonProduct> jsonProducts)
     {
