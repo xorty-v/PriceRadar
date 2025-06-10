@@ -13,8 +13,36 @@ internal sealed class StoreRepository : IStoreRepository
         _dbContext = dbContext;
     }
 
-    public async Task<List<Store>> GetStoresAsync()
+    public async Task AddStoreAsync(Store store)
+    {
+        _dbContext.Stores.Add(store);
+        await _dbContext.SaveChangesAsync();
+    }
+
+    public async Task UpdateStoreAsync(Store store)
+    {
+        _dbContext.Stores.Update(store);
+        await _dbContext.SaveChangesAsync();
+    }
+
+    public async Task DeleteStoreAsync(Store store)
+    {
+        _dbContext.Stores.Remove(store);
+        await _dbContext.SaveChangesAsync();
+    }
+
+    public async Task<Store> GetByIdAsync(Guid id)
+    {
+        return await _dbContext.Stores.SingleOrDefaultAsync(s => s.Id == id);
+    }
+
+    public async Task<List<Store>> GetAllAsync()
     {
         return await _dbContext.Stores.Where(s => s.IsParserImplemented).ToListAsync();
+    }
+
+    public async Task<Store> GetStoreByNameAsync(string name)
+    {
+        return await _dbContext.Stores.SingleOrDefaultAsync(s => s.Name == name);
     }
 }

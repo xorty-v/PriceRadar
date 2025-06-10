@@ -26,7 +26,7 @@ public class ParserService : IParserService
 
     public async Task RunAllParsers()
     {
-        var stores = await _storeRepository.GetStoresAsync();
+        var stores = await _storeRepository.GetAllAsync();
 
         foreach (var store in stores)
         {

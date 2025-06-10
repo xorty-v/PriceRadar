@@ -25,7 +25,7 @@ public class ZoommerParser : IParser
     public async Task<List<OfferRaw>> ParseAsync()
     {
         var categories =
-            await _storeCategoryRepository.GetCategoriesByStoreAsync(Constants.PredefinedIds.Stores.Zoommer);
+            await _storeCategoryRepository.GetAllByStoreIdAsync(Constants.PredefinedIds.Stores.Zoommer);
 
         var offers = new HashSet<OfferRaw>();
 

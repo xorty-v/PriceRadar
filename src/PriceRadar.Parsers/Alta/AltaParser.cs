@@ -27,7 +27,7 @@ public class AltaParser : IParser
 
     public async Task<List<OfferRaw>> ParseAsync()
     {
-        var categories = await _storeCategoryRepository.GetCategoriesByStoreAsync(Constants.PredefinedIds.Stores.Alta);
+        var categories = await _storeCategoryRepository.GetAllByStoreIdAsync(Constants.PredefinedIds.Stores.Alta);
 
         var offers = new HashSet<OfferRaw>();
 

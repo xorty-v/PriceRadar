@@ -13,6 +13,7 @@ var configuration = builder.Configuration;
 services.AddApplication();
 services.AddInfrastructure(configuration);
 services.AddParsers();
+services.AddControllers();
 
 services.AddHostedService<ChromiumInitializerService>();
 
@@ -36,5 +37,7 @@ app.MapGet("/run-parsers", async (IParserService parserService) =>
 
     return Results.Ok($"Parsing completed in {stopwatch.Elapsed:hh\\:mm\\:ss}.");
 });
+
+app.MapControllers();
 
 app.Run();

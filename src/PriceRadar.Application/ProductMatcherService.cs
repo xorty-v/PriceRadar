@@ -24,7 +24,7 @@ internal sealed class ProductMatcherService : IProductMatcherService
 
     public async Task MatchOffersToProductsAsync()
     {
-        var categories = await _categoryRepository.GetAllCategoriesAsync();
+        var categories = await _categoryRepository.GetAllAsync();
 
         foreach (var category in categories)
         {

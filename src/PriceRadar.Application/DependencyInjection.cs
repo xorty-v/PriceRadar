@@ -9,6 +9,9 @@ public static class DependencyInjection
     {
         services.AddScoped<IParserService, ParserService>();
         services.AddScoped<IProductMatcherService, ProductMatcherService>();
+        services.AddScoped<ICategoryService, CategoryService>();
+        services.AddScoped<IStoreService, StoreService>();
+        services.AddScoped<IStoreCategoryService, StoreCategoryService>();
 
         return services;
     }
