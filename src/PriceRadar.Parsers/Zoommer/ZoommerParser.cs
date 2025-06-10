@@ -1,65 +1,37 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using PriceRadar.Application;
 using PriceRadar.Application.Abstractions.Loaders;
 using PriceRadar.Application.Abstractions.Parsers;
+using PriceRadar.Domain;
+using PriceRadar.Domain.Interfaces;
 using PriceRadar.Domain.RawEntities;
-using PriceRadar.Parsers.Abstractions;
-using PriceRadar.Parsers.Zoommer.Helpers;
 using PriceRadar.Parsers.Zoommer.JsonModels;
 
 namespace PriceRadar.Parsers.Zoommer;
 
-public class ZoommerParser : BaseParser, IParser
+public class ZoommerParser : IParser
 {
-    private readonly ICategoryMapperService _categoryMapperService;
-    private readonly IStaticPageLoader _staticPageLoader;
+    private const string ProductUrl = "https://api.zoommer.ge/v1/Products/v3?CategoryId=";
 
-    public ZoommerParser(IStaticPageLoader staticPageLoader, ICategoryMapperService categoryMapperService)
+    private readonly IStaticPageLoader _staticPageLoader;
+    private readonly IStoreCategoryRepository _storeCategoryRepository;
+
+    public ZoommerParser(IStaticPageLoader staticPageLoader, IStoreCategoryRepository storeCategoryRepository)
     {
         _staticPageLoader = staticPageLoader;
-        _categoryMapperService = categoryMapperService;
+        _storeCategoryRepository = storeCategoryRepository;
     }
-
-    protected override string CategoryUrl { get; } = "https://api.zoommer.ge/v1/Categories/all-categories";
-    protected override string ProductUrl { get; } = "https://api.zoommer.ge/v1/Products/v3?CategoryId=";
 
     public async Task<List<OfferRaw>> ParseAsync()
     {
-        var categories = await ParseCategoriesAsync();
-        var offers = await ParseOffersAsync(categories);
+        var categories =
+            await _storeCategoryRepository.GetCategoriesByStoreAsync(Constants.PredefinedIds.Stores.Zoommer);
 
-        return offers.ToList();
-    }
-
-    public override async Task<List<CategoryRaw>> ParseCategoriesAsync()
-    {
-        var page = await _staticPageLoader.LoadPageAsync(CategoryUrl, HttpMethod.Get, null);
-        var response = JsonSerializer.Deserialize<List<JsonCategory>>(page);
-
-        var categories = response
-            .SelectMany(category => new[]
-            {
-                new CategoryRaw { Name = category.Name, Url = category.Url }
-            }.Concat(category.ChildCategories.Select(child => new CategoryRaw
-            {
-                Name = child.Name,
-                Url = child.Url
-            })))
-            .Where(c => _categoryMapperService.Map(StoreType.Zoommer, c.Name) != null)
-            .DistinctBy(c => c.Name)
-            .ToList();
-
-        return categories;
-    }
-
-    public override async Task<HashSet<OfferRaw>> ParseOffersAsync(List<CategoryRaw> categories)
-    {
         var offers = new HashSet<OfferRaw>();
-        var categoryUrls = ExtractCategoryUrls(categories);
 
-        foreach (var categoryUrl in categoryUrls)
+        foreach (var category in categories)
         {
+            var categoryUrl = Regex.Match(category.Url, @"c(\d+)").Groups[1].Value;
             var initialUrl = BuildPageUrl(categoryUrl, 1);
 
             var initialPage = await LoadPageAsync(initialUrl);
@@ -68,7 +40,7 @@ public class ZoommerParser : BaseParser, IParser
                 continue;
             }
 
-            offers.UnionWith(MapOffers(initialPage.Products));
+            offers.UnionWith(MapOffers(initialPage.Products, category.CategoryId));
 
             int totalPages = CalculateTotalPages(initialPage.TotalCount);
             if (totalPages <= 1)
@@ -83,20 +55,12 @@ public class ZoommerParser : BaseParser, IParser
                 var pageData = await LoadPageAsync(pageUrl);
                 if (pageData?.Products != null)
                 {
-                    offers.UnionWith(MapOffers(pageData.Products));
+                    offers.UnionWith(MapOffers(pageData.Products, category.CategoryId));
                 }
             }
         }
 
-        return offers;
-    }
-
-    private List<string> ExtractCategoryUrls(List<CategoryRaw> categories)
-    {
-        return categories
-            .Select(c => Regex.Match(c.Url, @"\d+$").Value)
-            .Where(url => !string.IsNullOrEmpty(url))
-            .ToList();
+        return offers.ToList();
     }
 
     private async Task<JsonProductList?> LoadPageAsync(string url)
@@ -115,7 +79,7 @@ public class ZoommerParser : BaseParser, IParser
 
     private int CalculateTotalPages(int totalCount) => (int)Math.Ceiling(totalCount / 28.0);
 
-    private IEnumerable<OfferRaw> MapOffers(List<JsonProduct> jsonProducts)
+    private IEnumerable<OfferRaw> MapOffers(List<JsonProduct> jsonProducts, Guid categoryId)
     {
         foreach (var jsonProduct in jsonProducts)
         {
@@ -125,7 +89,7 @@ public class ZoommerParser : BaseParser, IParser
             var offerRaw = new OfferRaw
             {
                 Name = jsonProduct.Name,
-                Category = CategoryMap.GetCategoryName(jsonProduct.CategoryId, jsonProduct.SubCategoryId),
+                CategoryId = categoryId,
                 Url = "https://zoommer.ge/en/" + jsonProduct.Route,
                 Price = hasDiscount ? jsonProduct.PreviousPrice.Value : jsonProduct.ActualPrice,
                 DiscountPrice = hasDiscount ? jsonProduct.ActualPrice : 0

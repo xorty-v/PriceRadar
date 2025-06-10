@@ -1,74 +1,44 @@
 using System.Text.Json;
-using AngleSharp;
-using PriceRadar.Application;
 using PriceRadar.Application.Abstractions.Loaders;
 using PriceRadar.Application.Abstractions.Parsers;
+using PriceRadar.Domain;
+using PriceRadar.Domain.Interfaces;
 using PriceRadar.Domain.RawEntities;
-using PriceRadar.Parsers.Abstractions;
 using PriceRadar.Parsers.EliteElectronic.JsonModels;
 using PriceRadar.Parsers.EliteElectronic.Requests;
 
 namespace PriceRadar.Parsers.EliteElectronic;
 
-public class EliteElectronicParser : BaseParser, IParser
+public class EliteElectronicParser : IParser
 {
-    private readonly IBrowsingContext _browsingContext;
-    private readonly ICategoryMapperService _categoryMapperService;
-    private readonly IStaticPageLoader _staticPageLoader;
+    private const string ProductUrl = "https://api.ee.ge/product/filter_products";
 
-    public EliteElectronicParser(
-        IStaticPageLoader staticPageLoader,
-        IBrowsingContext browsingContext,
-        ICategoryMapperService categoryMapperService)
+    private readonly IStaticPageLoader _staticPageLoader;
+    private readonly IStoreCategoryRepository _storeCategoryRepository;
+
+    public EliteElectronicParser(IStaticPageLoader staticPageLoader, IStoreCategoryRepository storeCategoryRepository)
     {
         _staticPageLoader = staticPageLoader;
-        _browsingContext = browsingContext;
-        _categoryMapperService = categoryMapperService;
+        _storeCategoryRepository = storeCategoryRepository;
     }
-
-    protected override string CategoryUrl { get; } = "https://ee.ge/";
-    protected override string ProductUrl { get; } = "https://api.ee.ge/product/filter_products";
 
     public async Task<List<OfferRaw>> ParseAsync()
     {
-        var categories = await ParseCategoriesAsync();
-        var offers = await ParseOffersAsync(categories);
+        var categories =
+            await _storeCategoryRepository.GetCategoriesByStoreAsync(Constants.PredefinedIds.Stores.EliteElectronic);
 
-        return offers.ToList();
-    }
-
-    public override async Task<List<CategoryRaw>> ParseCategoriesAsync()
-    {
-        var pageContent = await _staticPageLoader.LoadPageAsync(CategoryUrl, HttpMethod.Get, null);
-        var document = await _browsingContext.OpenAsync(req => req.Content(pageContent));
-
-        var categories = document
-            .QuerySelectorAll("div.dropdown-content a")
-            .Select(a => new CategoryRaw
-            {
-                Name = a.TextContent.Trim(),
-                Url = a.GetAttribute("href")
-            })
-            .Where(c => _categoryMapperService.Map(StoreType.EliteElectronic, c.Name) != null)
-            .ToList();
-
-        return categories;
-    }
-
-    public override async Task<HashSet<OfferRaw>> ParseOffersAsync(List<CategoryRaw> categories)
-    {
         var offers = new HashSet<OfferRaw>();
-        var categoryUrls = ExtractCategoryUrls(categories);
 
-        foreach (var categoryUrl in categoryUrls)
+        foreach (var category in categories)
         {
-            var initialPage = await LoadProductPageAsync(categoryUrl, 1);
+            var categoryUrl = category.Url.Split('/').Last();
+            var initialPage = await LoadPageAsync(categoryUrl, 1);
             if (initialPage?.Products == null)
             {
                 continue;
             }
 
-            offers.UnionWith(MapOffers(initialPage.Products));
+            offers.UnionWith(MapOffers(initialPage.Products, category.CategoryId));
 
             int totalPages = CalculateTotalPages(initialPage.TotalCount);
             if (totalPages <= 1)
@@ -78,26 +48,18 @@ public class EliteElectronicParser : BaseParser, IParser
 
             for (int page = 2; page <= totalPages; page++)
             {
-                var additionalData = await LoadProductPageAsync(categoryUrl, page);
+                var additionalData = await LoadPageAsync(categoryUrl, page);
                 if (additionalData?.Products != null)
                 {
-                    offers.UnionWith(MapOffers(additionalData.Products));
+                    offers.UnionWith(MapOffers(additionalData.Products, category.CategoryId));
                 }
             }
         }
 
-        return offers;
+        return offers.ToList();
     }
 
-    private List<string> ExtractCategoryUrls(List<CategoryRaw> categories)
-    {
-        return categories
-            .Select(c => c.Url.Split('/').Last())
-            .Where(part => !string.IsNullOrEmpty(part))
-            .ToList();
-    }
-
-    private async Task<JsonProductList?> LoadProductPageAsync(string categoryUrl, int page)
+    private async Task<JsonProductList?> LoadPageAsync(string categoryUrl, int page)
     {
         var requestBody = PostRequestBody.Create(categoryUrl, page);
         var pageContent = await _staticPageLoader.LoadPageAsync(ProductUrl, HttpMethod.Post, requestBody);
@@ -112,14 +74,14 @@ public class EliteElectronicParser : BaseParser, IParser
 
     private int CalculateTotalPages(int totalCount) => (int)Math.Ceiling(totalCount / 10.0);
 
-    private IEnumerable<OfferRaw> MapOffers(List<JsonProduct> jsonProducts)
+    private IEnumerable<OfferRaw> MapOffers(List<JsonProduct> jsonProducts, Guid categoryId)
     {
         foreach (var jsonProduct in jsonProducts)
         {
             var offerRaw = new OfferRaw
             {
                 Name = jsonProduct.Name,
-                Category = jsonProduct.Category,
+                CategoryId = categoryId,
                 Url = $"https://ee.ge/{jsonProduct.ParentCategory}/{jsonProduct.Category}/{jsonProduct.ProductSlug}",
                 Price = jsonProduct.ActualPrice,
                 DiscountPrice = jsonProduct.SalePrice

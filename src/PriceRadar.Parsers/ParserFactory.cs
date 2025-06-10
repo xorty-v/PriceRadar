@@ -15,14 +15,14 @@ internal sealed class ParserFactory : IParserFactory
         _serviceProvider = serviceProvider;
     }
 
-    public IParser CreateParser(StoreType storeType)
+    public IParser CreateParser(string storeName)
     {
-        return storeType switch
+        return storeName switch
         {
-            StoreType.EliteElectronic => _serviceProvider.GetService<EliteElectronicParser>(),
-            StoreType.Zoommer => _serviceProvider.GetService<ZoommerParser>(),
-            StoreType.Alta => _serviceProvider.GetService<AltaParser>(),
-            _ => throw new ArgumentException("Unknown store type")
+            "EliteElectronic" => _serviceProvider.GetService<EliteElectronicParser>(),
+            "Zoommer" => _serviceProvider.GetService<ZoommerParser>(),
+            "Alta" => _serviceProvider.GetService<AltaParser>(),
+            _ => throw new ArgumentException("Unknown store name")
         };
     }
 }

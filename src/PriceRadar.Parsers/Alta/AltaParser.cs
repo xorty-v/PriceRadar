@@ -1,61 +1,34 @@
 using AngleSharp;
 using AngleSharp.Dom;
-using PriceRadar.Application;
 using PriceRadar.Application.Abstractions.Loaders;
 using PriceRadar.Application.Abstractions.Parsers;
+using PriceRadar.Domain;
+using PriceRadar.Domain.Entities;
+using PriceRadar.Domain.Interfaces;
 using PriceRadar.Domain.RawEntities;
-using PriceRadar.Parsers.Abstractions;
 
 namespace PriceRadar.Parsers.Alta;
 
-public class AltaParser : BaseParser, IParser
+public class AltaParser : IParser
 {
     private readonly IBrowserPageLoader _browserPageLoader;
     private readonly IBrowsingContext _browsingContext;
-    private readonly ICategoryMapperService _categoryMapperService;
+    private readonly IStoreCategoryRepository _storeCategoryRepository;
 
     public AltaParser(
         IBrowserPageLoader browserPageLoader,
         IBrowsingContext browsingContext,
-        ICategoryMapperService categoryMapperService)
+        IStoreCategoryRepository storeCategoryRepository)
     {
         _browserPageLoader = browserPageLoader;
         _browsingContext = browsingContext;
-        _categoryMapperService = categoryMapperService;
+        _storeCategoryRepository = storeCategoryRepository;
     }
-
-    protected override string CategoryUrl { get; } = "https://alta.ge/?sl=en";
-    protected override string ProductUrl { get; } = string.Empty;
 
     public async Task<List<OfferRaw>> ParseAsync()
     {
-        var categories = await ParseCategoriesAsync();
-        var offers = await ParseOffersAsync(categories);
+        var categories = await _storeCategoryRepository.GetCategoriesByStoreAsync(Constants.PredefinedIds.Stores.Alta);
 
-        return offers.ToList();
-    }
-
-    public override async Task<List<CategoryRaw>> ParseCategoriesAsync()
-    {
-        var pageContent = await _browserPageLoader.LoadPageAsync(CategoryUrl);
-        var document = await _browsingContext.OpenAsync(req => req.Content(pageContent));
-
-        var categories = document
-            .QuerySelectorAll("li.ty-menu__submenu-item > a.ty-menu__submenu-link")
-            .Concat(document.QuerySelectorAll("div.ty-menu__submenu-item-header > a.ty-menu__submenu-link"))
-            .Select(a => new CategoryRaw
-            {
-                Name = a.TextContent.Trim(),
-                Url = a.GetAttribute("href")?.Trim()
-            })
-            .Where(c => _categoryMapperService.Map(StoreType.Alta, c.Name) != null)
-            .ToList();
-
-        return categories;
-    }
-
-    public override async Task<HashSet<OfferRaw>> ParseOffersAsync(List<CategoryRaw> categories)
-    {
         var offers = new HashSet<OfferRaw>();
 
         foreach (var category in categories)
@@ -67,7 +40,7 @@ public class AltaParser : BaseParser, IParser
             }
 
             var firstDocument = await _browsingContext.OpenAsync(req => req.Content(firstPageContent));
-            ExtractOffersFromPage(firstDocument, category.Name, offers);
+            ExtractOffersFromPage(firstDocument, category, offers);
 
             int totalPages = CalculateTotalPages(firstDocument);
             if (totalPages <= 1)
@@ -83,14 +56,14 @@ public class AltaParser : BaseParser, IParser
             foreach (var content in pageContents.Where(c => !string.IsNullOrWhiteSpace(c)))
             {
                 var document = await _browsingContext.OpenAsync(req => req.Content(content));
-                ExtractOffersFromPage(document, category.Name, offers);
+                ExtractOffersFromPage(document, category, offers);
             }
         }
 
-        return offers;
+        return offers.ToList();
     }
 
-    private void ExtractOffersFromPage(IDocument document, string categoryName, HashSet<OfferRaw> offers)
+    private void ExtractOffersFromPage(IDocument document, StoreCategory category, HashSet<OfferRaw> offers)
     {
         var productBlocks = document.QuerySelectorAll("div.ty-grid-list__item");
 
@@ -127,7 +100,7 @@ public class AltaParser : BaseParser, IParser
                     Url = fullUrl,
                     Price = price,
                     DiscountPrice = discountPrice,
-                    Category = categoryName
+                    CategoryId = category.CategoryId
                 });
             }
         }
@@ -153,12 +126,6 @@ public class AltaParser : BaseParser, IParser
         }
 
         return urls;
-    }
-
-    private async Task<List<string>> LoadPagesAsync1(List<string> urls)
-    {
-        var loadTasks = urls.Select(url => _browserPageLoader.LoadPageAsync(url));
-        return (await Task.WhenAll(loadTasks)).ToList();
     }
 
     private decimal? ParsePrice(string? priceText)

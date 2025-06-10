@@ -2,8 +2,8 @@ namespace PriceRadar.Domain.RawEntities;
 
 public record OfferRaw
 {
+    public Guid CategoryId { get; set; }
     public string Name { get; init; }
-    public string Category { get; set; }
     public string Url { get; init; }
     public decimal Price { get; init; }
     public decimal DiscountPrice { get; init; }

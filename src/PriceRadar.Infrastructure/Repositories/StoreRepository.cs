@@ -13,8 +13,8 @@ internal sealed class StoreRepository : IStoreRepository
         _dbContext = dbContext;
     }
 
-    public async Task<Store> GetStoreByNameAsync(string name)
+    public async Task<List<Store>> GetStoresAsync()
     {
-        return await _dbContext.Stores.SingleOrDefaultAsync(s => s.Name == name);
+        return await _dbContext.Stores.Where(s => s.IsParserImplemented).ToListAsync();
     }
 }

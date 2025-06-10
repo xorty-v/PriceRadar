@@ -4,12 +4,6 @@ namespace PriceRadar.Parsers.Zoommer.JsonModels;
 
 public class JsonProduct
 {
-    [JsonPropertyName("categoryId")] 
-    public int CategoryId { get; set; }
-
-    [JsonPropertyName("subCategoryId")] 
-    public int SubCategoryId { get; set; }
-
     [JsonPropertyName("name")] 
     public string Name { get; set; }
 
@@ -21,7 +15,4 @@ public class JsonProduct
 
     [JsonPropertyName("route")] 
     public string Route { get; set; }
-
-    [JsonPropertyName("parentCategoryName")]
-    public string ParentCategory { get; set; }
 }

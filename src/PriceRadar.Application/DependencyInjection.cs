@@ -8,7 +8,6 @@ public static class DependencyInjection
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
         services.AddScoped<IParserService, ParserService>();
-        services.AddScoped<ICategoryMapperService, CategoryMapperService>();
         services.AddScoped<IProductMatcherService, ProductMatcherService>();
 
         return services;

@@ -4,5 +4,5 @@ namespace PriceRadar.Domain.Interfaces;
 
 public interface IStoreRepository
 {
-    public Task<Store> GetStoreByNameAsync(string name);
+    public Task<List<Store>> GetStoresAsync();
 }

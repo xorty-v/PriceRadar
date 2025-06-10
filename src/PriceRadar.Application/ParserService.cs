@@ -7,7 +7,6 @@ namespace PriceRadar.Application;
 
 public class ParserService : IParserService
 {
-    private readonly ICategoryMapperService _categoryMapperService;
     private readonly IOfferRepository _offerRepository;
     private readonly IParserFactory _parserFactory;
     private readonly IProductMatcherService _productMatcherService;
@@ -17,26 +16,23 @@ public class ParserService : IParserService
         IParserFactory parserFactory,
         IOfferRepository offerRepository,
         IStoreRepository storeRepository,
-        ICategoryMapperService categoryMapperService,
         IProductMatcherService productMatcherService)
     {
         _parserFactory = parserFactory;
         _offerRepository = offerRepository;
         _storeRepository = storeRepository;
-        _categoryMapperService = categoryMapperService;
         _productMatcherService = productMatcherService;
     }
 
     public async Task RunAllParsers()
     {
-        var storeTypes = Enum.GetValues<StoreType>().ToList();
+        var stores = await _storeRepository.GetStoresAsync();
 
-        foreach (var storeType in storeTypes)
+        foreach (var store in stores)
         {
-            var parser = _parserFactory.CreateParser(storeType);
+            var parser = _parserFactory.CreateParser(store.Name);
             var rawOffers = await parser.ParseAsync();
 
-            var store = await _storeRepository.GetStoreByNameAsync(storeType.ToString());
             var existingOffers = await _offerRepository.GetOffersByStoreAsync(store.Id);
 
             var existingDict = existingOffers.ToDictionary(o => o.Url, o => o);
@@ -72,7 +68,7 @@ public class ParserService : IParserService
                     {
                         Url = rawOffer.Url,
                         Name = rawOffer.Name,
-                        CategoryId = _categoryMapperService.Map(storeType, rawOffer.Category).Value,
+                        CategoryId = rawOffer.CategoryId,
                         StoreId = store.Id,
                         IsAvailable = true,
                         PriceHistories = new List<PriceHistory>
